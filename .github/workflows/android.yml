@@ -1,0 +1,48 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v4
+
+      - name: Extract Android project
+        run: |
+          mkdir -p build-project
+          unzip -o POSS​mart_Android_Cloud_Build.zip -d build-project
+          echo "Extracted files:"
+          find build-project -maxdepth 3 -type f | head -100
+
+      - name: Find Gradle project
+        run: |
+          GRADLEW=$(find build-project -name gradlew -type f | head -1)
+          if [ -z "$GRADLEW" ]; then
+            echo "gradlew was not found"
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$GRADLEW")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
+      - name: Build APK
+        run: |
+          chmod +x "$PROJECT_DIR/gradlew"
+          cd "$PROJECT_DIR"
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Find APK
+        run: |
+          find build-project -name "*.apk" -type f
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: POSsmart-APK
+          path: build-project/**/*.apk
