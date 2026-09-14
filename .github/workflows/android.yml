@@ -1,48 +1,71 @@
-name: Build Android APK
+name: إنشاء ملف APK لنظام Android
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download repository
+      - name: تنزيل المستودع
         uses: actions/checkout@v4
 
-      - name: Extract Android project
+      - name: استخراج مشروع أندرويد
         run: |
           mkdir -p build-project
-          unzip -o POSS​mart_Android_Cloud_Build.zip -d build-project
-          echo "Extracted files:"
-          find build-project -maxdepth 3 -type f | head -100
 
-      - name: Find Gradle project
-        run: |
-          GRADLEW=$(find build-project -name gradlew -type f | head -1)
-          if [ -z "$GRADLEW" ]; then
-            echo "gradlew was not found"
+          ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "لم يتم العثور على ملف ZIP"
             exit 1
           fi
-          PROJECT_DIR=$(dirname "$GRADLEW")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
 
-      - name: Build APK
+          echo "سيتم استخراج: $ZIP_FILE"
+          unzip -o "$ZIP_FILE" -d build-project
+
+          echo "الملفات المستخرجة:"
+          find build-project -maxdepth 3 -type f | head -100
+
+      - name: البحث عن مشروع Gradle
         run: |
-          chmod +x "$PROJECT_DIR/gradlew"
+          GRADLEW=$(find build-project -type f -name gradlew | head -n 1)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "لم يتم العثور على gradlew"
+            exit 1
+          fi
+
+          chmod +x "$GRADLEW"
+
+          PROJECT_DIR=$(dirname "$GRADLEW")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+          echo "مشروع Gradle: $PROJECT_DIR"
+
+      - name: إنشاء ملف APK
+        run: |
           cd "$PROJECT_DIR"
           ./gradlew assembleDebug --no-daemon
 
-      - name: Find APK
+      - name: البحث عن ملف APK
         run: |
-          find build-project -name "*.apk" -type f
+          APK_FILE=$(find "$PROJECT_DIR" -type f -name "*.apk" | head -n 1)
 
-      - name: Upload APK
+          if [ -z "$APK_FILE" ]; then
+            echo "لم يتم العثور على APK"
+            exit 1
+          fi
+
+          echo "APK_FILE=$APK_FILE" >> "$GITHUB_ENV"
+          echo "تم العثور على: $APK_FILE"
+
+      - name: رفع ملف APK
         uses: actions/upload-artifact@v4
         with:
-          name: POSsmart-APK
-          path: build-project/**/*.apk
+          name: POSSmart-APK
+          path: ${{ env.APK_FILE }}
